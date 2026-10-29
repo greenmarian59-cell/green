@@ -9,9 +9,11 @@ from src.core.security import get_user_id_from_token
 from src.database.models import User
 from src.database.session import get_session
 from src.repositories.category import CategoryRepository
+from src.repositories.client_ip import ClientIpRepository
 from src.repositories.project import ProjectRepository, UserProjectRepository, ProjectImageRepository
 from src.repositories.user import UserRepository
 from src.services.category import CategoryService
+from src.services.client_ip import ClientIpService
 from src.services.project import ProjectBaseService
 from src.services.user import UserService
 
@@ -21,6 +23,11 @@ user_access_token_scheme = HTTPBearer(scheme_name="user-access-token", auto_erro
 def get_category_service() -> CategoryService:
     repository = CategoryRepository()
     return CategoryService(repository)
+
+def get_client_ip_service() -> ClientIpService:
+    repository = ClientIpRepository()
+    project_repo = ProjectRepository()
+    return ClientIpService(repository, project_repo)
 
 
 def get_user_service() -> UserService:

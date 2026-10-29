@@ -1,16 +1,17 @@
 from typing import List
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from src.core.exceptions import NotFoundError, ConflictError
 from src.database.models import User
+from src.database.models.client_ip import ClientIp
 from src.database.models.project import Project, UserProject, ProjectImage
 from src.repositories.project import ProjectRepository, UserProjectRepository, ProjectImageRepository
-from src.schemas.project_schema import ProjectUpdate
+from src.schemas.project_schema import ProjectUpdate, ProjectDefaultResponse
 from src.services.base import BaseService, ModelType
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.utils.files import save_image
+from src.utils.files import save_image, delete_file
 
 
 class ProjectBaseService(BaseService[Project]):
@@ -47,6 +48,7 @@ class ProjectBaseService(BaseService[Project]):
         if user_project.project_id != project_id:
             raise ConflictError(f"User has no id:{project_id} project")
         project = user_project.project
+
         for field, value in obj.model_dump(exclude_unset=True).items():
             setattr(project, field, value)
         project_update = await self.project_repo.update(session, project)
@@ -64,8 +66,8 @@ class ProjectBaseService(BaseService[Project]):
         await session.commit()
         return obj
 
-    async def create_images(self, session: AsyncSession, obj:ProjectImage, project_id: int) -> ProjectImage:
-        check_project = await self.project_repo.get(session, project_id)
+    async def create_images(self, session: AsyncSession, obj:List[UploadFile], project_id: int) -> ProjectDefaultResponse | None:
+        check_project = await self.project_repo.check_project(session, project_id)
         if check_project is None:
             raise NotFoundError(f"Project with id {project_id} does not exist")
         # new_images = []
@@ -73,11 +75,20 @@ class ProjectBaseService(BaseService[Project]):
         #     new_images.append(save_image(image))
         # obj = ProjectImage(**{"project_id": project_id, "images": new_images})
         # await self.project_image_repo.create(session, obj)
+        if check_project.images:
+            for item in check_project.images:
+                delete_file(item.image)
+                await self.project_image_repo.delete(session, item)
+
         for image in obj:
             new_image = await save_image(image)
             result = ProjectImage(**{"project_id": project_id, "image": new_image})
             await self.project_image_repo.create(session, result)
             await session.commit()
+
+        return ProjectDefaultResponse(massage="Project created successfully")
+
+
 
 
 

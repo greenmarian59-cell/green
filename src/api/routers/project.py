@@ -1,10 +1,12 @@
 from typing import List, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.database.models import Project, User
-from src.api.dependancies import get_project_service, get_current_user
-from src.schemas.project_schema import ProjectBase, ProjectCreate, ProjectUpdate, ProjectImage
+from src.database.models import Project, User, ClientIp
+from src.api.dependancies import get_project_service, get_current_user, get_client_ip_service
+from src.schemas.project_schema import ProjectBase, ProjectCreate, ProjectUpdate, ProjectImage, ClientIpResponse, \
+    ProjectDefaultResponse
+from src.services.client_ip import ClientIpService
 from src.services.project import ProjectBaseService
 from src.database.session import get_session
 from src.utils.files import save_image
@@ -19,7 +21,7 @@ async def get_all_project(
 ):
     return await service.get_all_by_user(session=session, user_id=current_user.id)
 
-@router.post("/images/{project_id}", status_code=status.HTTP_201_CREATED)
+@router.post("/images/{project_id}",response_model = ProjectDefaultResponse, status_code=status.HTTP_201_CREATED)
 async def create_project_images(
         project_id: int,
         images: List[UploadFile] = File(),
@@ -43,16 +45,19 @@ async def create_project(
     new_project = await service.create(session=session, obj=db_project, user=current_user)
     return new_project
 
-@router.post("/star", status_code=status.HTTP_200_OK)
+@router.post("/star",response_model = ProjectDefaultResponse, status_code=status.HTTP_200_OK)
 async def create_star(
         project_id: int,
         request: Request,
         session: AsyncSession = Depends(get_session),
-        service: ProjectBaseService = Depends(get_project_service),
+        service: ClientIpService = Depends(get_client_ip_service),
 ):
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent")
-    return {"client": client_ip, "user_agent": user_agent}
+    project_id = project_id
+    new_client_ip = ClientIp(client=client_ip, user_agent=user_agent, project_id=project_id)
+    return await service.add_star(session, new_client_ip)
+
 
 @router.get("/{project_id}", response_model=ProjectBase, status_code=status.HTTP_200_OK)
 async def get_project_by_id(
@@ -66,8 +71,8 @@ async def get_project_by_id(
 
 @router.put("/{project_id}", response_model=ProjectBase, status_code=status.HTTP_200_OK)
 async def update_project(
-        payload: ProjectUpdate,
         project_id: int,
+        payload: ProjectUpdate,
         current_user: User = Depends(get_current_user),
         session: AsyncSession = Depends(get_session),
         service: ProjectBaseService = Depends(get_project_service),

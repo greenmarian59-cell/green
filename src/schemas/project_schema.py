@@ -15,7 +15,6 @@ class ProjectBase(BaseModel):
     stars: int
     images: List[ProjectImage]
 
-
 class ProjectCreate(BaseModel):
     title: str
     description: str
@@ -29,3 +28,11 @@ class ProjectUpdate(ProjectCreate):
 class ProjectImage(BaseModel):
     image: str
 
+
+class ClientIpResponse(BaseModel):
+    id: int
+    client_ip: str
+    user_agent: str
+
+class ProjectDefaultResponse(BaseModel):
+    massage: str

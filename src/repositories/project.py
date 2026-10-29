@@ -1,6 +1,6 @@
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
 
@@ -17,6 +17,18 @@ class ProjectRepository(BaseRepository[Project]):
         stmt = stmt.where(self.model.title == title)
 
         return await session.scalar(stmt)
+
+    async def check_project(self, session: AsyncSession, project_id: int) -> Project | None:
+        stmt = select(self.model)
+
+        stmt = stmt.where(self.model.id == project_id).options(selectinload(Project.images))
+        project = await session.scalar(stmt)
+        return project
+
+    async def update_star(self, session: AsyncSession, project_id: int) -> None:
+        stmt = update(self.model).where(Project.id == project_id).values(stars=self.model.stars + 1)
+        await session.execute(stmt)
+        await session.flush()
 
 
 
